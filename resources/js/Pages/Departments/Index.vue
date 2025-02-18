@@ -14,6 +14,7 @@
                             :openCreateModal="openCreateModal"
                             :editDepartment="editDepartment"
                             :confirmDeleteDepartment="confirmDeleteDepartment"
+                            :users="users"
                         />
                     </div>
                 </div>
@@ -25,6 +26,7 @@
             :createForm="createForm"
             :closeCreateModal="closeCreateModal"
             :submitCreate="submitCreate"
+            :users="availableUsers" 
         />
 
         <EditDepartmentModal 
@@ -32,6 +34,8 @@
             :form="form"
             :closeEditModal="closeEditModal"
             :submitEdit="submitEdit"
+            :users="users"
+            :availableUsers="availableUsers"
         />
 
         <ConfirmDeleteModal 
@@ -56,6 +60,8 @@ import { Head } from '@inertiajs/vue3';
 
 const page = usePage();
 let departments = ref([]);
+let users = ref([]);
+let availableUsers = ref([]);
 const loading = ref(true);
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
@@ -65,19 +71,19 @@ const selectedDepartment = ref(null);
 const createForm = useForm({
     name: '',
     description: '',
+    members: [],
+    main_responsible: null
 });
 
 const form = useForm({
     name: '',
     description: '',
+    members: [],
+    main_responsible: null
 });
 
 onMounted(() => {
-    // Simulate fetching data from server
-    setTimeout(() => {
-        departments.value = [...page.props.departments];
-        loading.value = false;
-    }, 1000);
+    loadData();
 
     const pageProps = usePage().props.value;
     if (pageProps && pageProps.flash) {
@@ -91,6 +97,32 @@ onMounted(() => {
     }
 });
 
+async function loadData() {
+    try {
+        // Chuyển đổi members từ chuỗi JSON thành mảng
+        departments.value = page.props.departments.map(department => {
+            department.members = JSON.parse(department.members || '[]');
+            return department;
+        });
+
+        // Lấy danh sách người dùng thuộc các phòng ban
+        const usersInDepartments = departments.value.reduce((acc, department) => {
+            return acc.concat(department.members);
+        }, []);
+
+        // Lọc danh sách người dùng chưa thuộc phòng ban nào
+        availableUsers.value = page.props.users.filter(user => !usersInDepartments.includes(user.id));
+
+        // Gán dữ liệu users
+        users.value = [...page.props.users];
+
+        loading.value = false;
+    } catch (error) {
+        console.error('Failed to load data:', error);
+        toastr.error('Failed to load data.');
+    }
+}
+
 function openCreateModal() {
     createForm.reset();
     showCreateModal.value = true;
@@ -101,10 +133,14 @@ function closeCreateModal() {
 }
 
 function submitCreate() {
-    createForm.post(route('departments.store'), {
+    createForm.transform((data) => ({
+        ...data,
+        members: JSON.stringify(data.members)
+    })).post(route('departments.store'), {
         onSuccess: () => {
             toastr.success('Department created successfully.');
-            window.location.reload();
+            loadData();
+            showCreateModal.value = false;
         },
         onError: (error) => {
             toastr.error('Failed to create department.');
@@ -117,14 +153,20 @@ function editDepartment(department) {
     selectedDepartment.value = department;
     form.name = department.name;
     form.description = department.description;
+    form.members = Array.isArray(department.members) ? department.members : (JSON.parse(department.members) || []); // Đảm bảo members là một mảng
+    form.main_responsible = department.main_responsible;
     showEditModal.value = true;
 }
 
 function submitEdit() {
-    form.put(route('departments.update', selectedDepartment.value.id), {
+    form.transform((data) => ({
+        ...data,
+        members: JSON.stringify(data.members)
+    })).put(route('departments.update', selectedDepartment.value.id), {
         onSuccess: () => {
-            updateDepartmentInList(selectedDepartment.value.id, form.name, form.description);
+            updateDepartmentInList(selectedDepartment.value.id, form.name, form.description, form.members, form.main_responsible);
             toastr.success('Department updated successfully.');
+            loadData();
             showEditModal.value = false;
         },
         onError: (error) => {
@@ -138,11 +180,13 @@ function closeEditModal() {
     showEditModal.value = false;
 }
 
-function updateDepartmentInList(id, name, description) {
+function updateDepartmentInList(id, name, description, members, main_responsible) {
     const department = departments.value.find(dep => dep.id === id);
     if (department) {
         department.name = name;
         department.description = description;
+        department.members = members;
+        department.main_responsible = main_responsible;
     }
 }
 
@@ -156,6 +200,7 @@ function deleteDepartment() {
         onSuccess: () => {
             departments.value = departments.value.filter(dep => dep.id !== selectedDepartment.value.id);
             toastr.success('Department deleted successfully.');
+            loadData();
             showConfirmModal.value = false;
         },
         onError: (error) => {

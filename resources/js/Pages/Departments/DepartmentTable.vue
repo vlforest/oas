@@ -23,15 +23,21 @@
             <table class="min-w-full leading-normal table-fixed">
                 <thead>
                     <tr>
-                        <th class="px-5 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                        <th class="px-5 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">中文</th>
-                        <th class="px-5 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        <th class="w-1/6 px-5 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                        <th class="w-1/6 px-5 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                        <th class="w-1/2 px-5 py-2 border-b border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Members</th>
+                        <th class="w-1/6 px-5 py-2 border-b border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Main Responsible</th>
+                        <th class="w-1/12 px-5 py-2 border-b border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(department, index) in departments" :key="department.id" :class="{'bg-gray-50': index % 2 !== 0, 'bg-white': index % 2 === 0}">
                         <td class="px-5 py-2 border-b border-gray-200 text-sm">{{ department.name }}</td>
                         <td class="px-5 py-2 border-b border-gray-200 text-sm">{{ department.description }}</td>
+                        <td class="px-5 py-2 border-b border-gray-200 text-sm">
+                            <span>{{ department.members.map(member => getUserName(member)).join(', ') }}</span>
+                        </td>
+                        <td class="px-5 py-2 border-b border-gray-200 text-sm">{{ getUserName(department.main_responsible) }}</td>
                         <td class="px-5 py-2 border-b border-gray-200 text-sm text-center flex justify-center space-x-2">
                             <button 
                                 @click="editDepartment(department)" 
@@ -62,13 +68,13 @@ const props = defineProps({
     openCreateModal: Function,
     editDepartment: Function,
     confirmDeleteDepartment: Function,
+    users: { type: Array, default: () => [] } 
 });
 
 const createButtonStyle = ref({
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    position: 'absolute'
+    top: '80%',
+    left: '90%',
+    position: 'fixed'
 });
 
 let dragging = false;
@@ -117,5 +123,11 @@ const stopDrag = () => {
 
     localStorage.setItem('createButtonTop', createButtonStyle.value.top);
     localStorage.setItem('createButtonLeft', createButtonStyle.value.left);
+};
+
+const getUserName = (id) => {
+    if (!props.users || props.users.length === 0) return 'N/A';
+    const user = props.users.find(user => user.id === id);
+    return user ? user.name : 'N/A';
 };
 </script>

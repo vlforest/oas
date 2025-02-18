@@ -9,5 +9,15 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description'];
+    protected $fillable = [
+        'name',
+        'description',
+        'members',
+        'main_responsible',
+    ];
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'department_user');
+    }
 }

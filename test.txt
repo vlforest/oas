@@ -1,143 +1,144 @@
-<script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
-import { ref, defineProps, onMounted } from 'vue';
-import { useForm, usePage, router } from '@inertiajs/vue3';
-import DangerButton from '@/Components/DangerButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue'; // Bổ sung import
-import Switcher from '@/Components/Switcher.vue';
-import toastr from 'toastr';
-import 'toastr/build/toastr.min.css';
-
-// Define props
-const props = defineProps({
-    users: Array,
-    flash: Object,
-});
-
-const users = ref(props.users);
-const form = useForm({});
-const showConfirmDeleteModal = ref(false);
-const userToDelete = ref(null);
-
-onMounted(() => {
-    const pageProps = usePage().props.value;
-    if (pageProps && pageProps.flash) {
-        const flash = pageProps.flash;
-        if (flash.success) {
-            toastr.success(flash.success);
-        }
-        if (flash.error) {
-            toastr.error(flash.error);
-        }
-    }
-});
-
-function toggleRole(user, newRole) {
-    router.patch(route('users.update', user.id), {
-        role: newRole ? 'Verified' : 'Pending',
-    }, {
-        onSuccess: () => {
-            // Update the user's role in the users list
-            const index = users.value.findIndex(u => u.id === user.id);
-            if (index !== -1) {
-                users.value[index].role = newRole ? 'Verified' : 'Pending';
-            }
-            toastr.success('User role updated successfully.');
-        },
-        onError: () => {
-            toastr.error('Failed to update user role.');
-        },
-    });
-}
-
-function confirmDeleteUser(user) {
-    userToDelete.value = user;
-    showConfirmDeleteModal.value = true;
-}
-
-function deleteUser() {
-    if (userToDelete.value) {
-        router.delete(route('users.destroy', userToDelete.value.id), {
-            onSuccess: () => {
-                // Remove the user from the users list
-                const index = users.value.findIndex(u => u.id === userToDelete.value.id);
-                if (index !== -1) {
-                    users.value.splice(index, 1);
-                }
-                toastr.success('User deleted successfully.');
-                showConfirmDeleteModal.value = false;
-            },
-            onError: () => {
-                toastr.error('Failed to delete user.');
-            },
-        });
-    }
-}
-</script>
 <template>
-    <Head title="User Management" />
-
-    <AuthenticatedLayout>
-        <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                User Management
-            </h2>
-        </template>
-
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-900">
-                        <table class="min-w-full leading-normal">
-                            <thead>
-                                <tr>
-                                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-                                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="user in users" :key="user.id">
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">{{ user.name }}</td>
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">{{ user.email }}</td>
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        <Switcher :modelValue="user.role === 'Verified'" @update:modelValue="newRole => toggleRole(user, newRole)" />
-                                    </td>
-                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        <DangerButton @click="confirmDeleteUser(user)">
-                                            <i class="material-icons align-middle me-1">delete</i>
-                                            Delete
-                                        </DangerButton>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+    <div v-if="showCreateModal" class="fixed inset-0 flex items-center justify-center z-50">
+        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-lg sm:w-full">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Create Department</h3>
+                <form @submit.prevent="prepareAndSubmit">
+                    <div class="mt-4">
+                        <label for="department-name" class="block text-sm font-medium text-gray-700">
+                            Department Name
+                            <input id="department-name" name="department-name" type="text" v-model="createForm.name"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                        </label>
+                        <InputError :message="createForm.errors.name" class="mt-2 text-sm text-red-600" />
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Confirmation Modal for deleting user -->
-        <div v-if="showConfirmDeleteModal" class="fixed inset-0 flex items-center justify-center z-50">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-            <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-md sm:w-full">
-                <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Deletion</h3>
-                    <p class="mt-2 text-sm text-gray-600">Are you sure you want to delete this user?</p>
+                    <div class="mt-4">
+                        <label for="department-description" class="block text-sm font-medium text-gray-700">
+                            Description
+                            <input id="department-description" name="department-description" type="text" v-model="createForm.description"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                        </label>
+                        <InputError :message="createForm.errors.description" class="mt-2 text-sm text-red-600" />
+                    </div>
+
+                    <!-- Chọn Nhân Viên -->
+                    <div class="mt-4">
+                        <span class="block text-sm font-medium text-gray-700">Chọn Nhân Viên</span>
+                        <div class="flex">
+                            <!-- Danh sách có thể chọn -->
+                            <div class="w-1/2">
+                                <h4 class="text-sm font-medium text-gray-900">Available Users</h4>
+                                <ul class="mt-1 border border-gray-300 rounded-md shadow-sm overflow-auto h-32">
+                                    <li v-for="user in availableUsers" :key="'available-' + user.id"
+                                        class="px-3 py-2 border-b border-gray-200 cursor-pointer hover:bg-gray-100">
+                                        <label class="flex items-center w-full cursor-pointer">
+                                            <input type="checkbox" :id="'user-' + user.id" name="user-selection"
+                                                class="hidden" @change="selectUser(user)">
+                                            <span class="ml-2">{{ user.name }}</span>
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                            <!-- Danh sách đã chọn -->
+                            <div class="w-1/2">
+                                <h4 class="text-sm font-medium text-gray-900">Selected Users</h4>
+                                <ul class="mt-1 border border-gray-300 rounded-md shadow-sm overflow-auto h-32">
+                                    <li v-for="member in selectedUsers" :key="'selected-' + member.id"
+                                        class="px-3 py-2 border-b border-gray-200 cursor-pointer hover:bg-gray-100">
+                                        <label class="flex items-center w-full cursor-pointer">
+                                            <input type="checkbox" :id="'selected-' + member.id" name="selected-users"
+                                                class="hidden" @change="removeUser(member)">
+                                            <span class="ml-2">{{ member.name }}</span>
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nhân viên phụ trách chính -->
+                    <div class="mt-4" v-if="selectedUsers.length > 0">
+                        <label for="main-responsible" class="block text-sm font-medium text-gray-700">
+                            Chọn Nhân Viên Phụ Trách Chính
+                            <select id="main-responsible" name="main-responsible" v-model="createForm.main_responsible"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                                <option v-for="member in selectedUsers" :key="'main-responsible-' + member.id" :value="member.id">
+                                    {{ member.name }}
+                                </option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div v-if="!createForm.name || !createForm.description || selectedUsers.length === 0"
+                        class="mt-4 text-sm text-red-600">
+                        Please fill all required fields and select at least one user.
+                    </div>
+
                     <div class="mt-4 flex items-center justify-end">
-                        <SecondaryButton type="button" @click="showConfirmDeleteModal = false" class="me-2">
+                        <SecondaryButton type="button" @click="closeCreateModalAndReset" class="me-2">
                             <i class="material-icons align-middle me-1">cancel</i>
                             Cancel
                         </SecondaryButton>
-                        <DangerButton type="button" @click="deleteUser">
-                            <i class="material-icons align-middle me-1">delete</i>
-                            Delete
-                        </DangerButton>
+                        <PrimaryButton v-if="createForm.name && createForm.description && selectedUsers.length > 0"
+                            type="submit" :class="{ 'opacity-25': createForm.processing }" :disabled="createForm.processing">
+                            <i class="material-icons align-middle me-1">save</i>
+                            Create
+                        </PrimaryButton>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </div>
 </template>
+
+<script setup>
+import { ref, computed } from 'vue';
+import InputError from '@/Components/InputError.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+
+const props = defineProps({
+    showCreateModal: Boolean,
+    createForm: Object,
+    users: Array,
+    closeCreateModal: Function,
+    submitCreate: Function
+});
+
+const selectedUsers = ref([]);
+const availableUsers = computed(() => props.users.filter(user => !selectedUsers.value.some(selected => selected.id === user.id)));
+
+const resetForm = () => {
+    props.createForm.name = '';
+    props.createForm.description = '';
+    props.createForm.main_responsible = null;
+    selectedUsers.value = [];
+};
+
+const selectUser = (user) => {
+    if (!selectedUsers.value.some(selected => selected.id === user.id)) {
+        selectedUsers.value.push(user);
+    }
+};
+
+const removeUser = (user) => {
+    selectedUsers.value = selectedUsers.value.filter(selected => selected.id !== user.id);
+};
+
+const prepareAndSubmit = () => {
+    if (selectedUsers.value.length === 0) {
+        alert("Please select at least one member.");
+        return;
+    }
+    props.createForm.members = selectedUsers.value.map(user => user.id);
+    props.submitCreate();
+    resetForm();
+};
+
+const closeCreateModalAndReset = () => {
+    resetForm();
+    props.closeCreateModal();
+};
+</script>

@@ -45,4 +45,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function departments()
+    {
+        return $this->belongsToMany(Department::class, 'department_user'); // Giả sử bạn có bảng trung gian department_user
+    }
 }

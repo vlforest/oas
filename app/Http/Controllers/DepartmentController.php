@@ -3,46 +3,51 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::all();
-        return inertia('Departments/Index', ['departments' => $departments]);
+        $departments = Department::with('users')->get()->map(function ($department) {
+            $department->members = json_decode($department->members);
+            return $department;
+        });
+
+        $users = User::where('role', 'Verified')->get();
+
+        return inertia('Departments/Index', [
+            'departments' => $departments,
+            'users' => $users
+        ]);
     }
 
-    public function create()
-    {
-        return inertia('Departments/Create');
-    }
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'members' => 'nullable|json',
+            'main_responsible' => 'nullable|exists:users,id',
         ]);
-    
-        $department = Department::create($validated);
-    
+
+        $department = Department::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'members' => json_encode($validated['members']),
+            'main_responsible' => $validated['main_responsible'],
+        ]);
+
+        if (!empty($validated['members'])) {
+            $members = json_decode($validated['members']);
+            $department->users()->sync($members);
+        }
+
         return redirect()->route('departments.index')->with([
             'success' => 'Department created successfully.',
             'id' => $department->id
         ]);
-    }
-    
-    
-    
-
-    public function show(Department $department)
-    {
-        return inertia('Departments/Show', ['department' => $department]);
-    }
-
-    public function edit(Department $department)
-    {
-        return inertia('Departments/Edit', ['department' => $department]);
     }
 
     public function update(Request $request, Department $department)
@@ -50,9 +55,21 @@ class DepartmentController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'members' => 'nullable|json',
+            'main_responsible' => 'nullable|exists:users,id',
         ]);
 
-        $department->update($validated);
+        $department->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'members' => json_encode($validated['members']),
+            'main_responsible' => $validated['main_responsible'],
+        ]);
+
+        if (!empty($validated['members'])) {
+            $members = json_decode($validated['members']);
+            $department->users()->sync($members);
+        }
 
         return redirect()->route('departments.index')->with('success', 'Department updated successfully.');
     }
